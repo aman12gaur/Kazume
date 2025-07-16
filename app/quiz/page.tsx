@@ -13,6 +13,7 @@ import Link from "next/link"
 import { ChatOpenAI } from "@langchain/openai";
 import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
 import { HumanMessage } from "@langchain/core/messages";
+import { supabase } from '@/lib/supabaseClient';
 
 interface Question {
   id: string
@@ -416,7 +417,7 @@ export default function QuizPage() {
     }
   }
 
-  const handleQuizComplete = () => {
+  const handleQuizComplete = async () => {
     const endTime = new Date()
     const timeTaken = startTime ? Math.floor((endTime.getTime() - startTime.getTime()) / 1000) : 0
 
@@ -434,16 +435,35 @@ export default function QuizPage() {
       return { questionId: q.id, selectedAnswer: picked, isCorrect }
     })
 
-    setQuizResult({
+    const result = {
       score: Math.round((correct / currentQuestions.length) * 100),
       totalQuestions: currentQuestions.length,
       correctAnswers: correct,
       wrongAnswers: currentQuestions.length - correct,
       timeTaken: formatTime(timeTaken),
       answers,
-    })
+    }
 
+    setQuizResult(result)
     setQuizState("completed")
+
+    // Store result in Supabase
+    await supabase.from('quiz_results').insert([
+      {
+        subject: selectedSubject,
+        chapter: selectedChapter,
+        topic: selectedTopic,
+        difficulty: selectedDifficulty,
+        score: result.score,
+        total_questions: result.totalQuestions,
+        correct_answers: result.correctAnswers,
+        wrong_answers: result.wrongAnswers,
+        time_taken: result.timeTaken,
+        answers: JSON.stringify(result.answers),
+        is_using_ai: isUsingAI,
+        timestamp: new Date().toISOString(),
+      }
+    ])
   }
 
   const resetQuiz = () => {

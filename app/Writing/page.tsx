@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Navbar } from "@/components/navbar"
 import { RotateCcw, Play, BookOpen, Target, Clock } from "lucide-react"
+import { supabase } from '@/lib/supabaseClient';
 
 // Exposed SambaNova Key
 const SAMBANOVA_API_KEY = "8cd9f61e-8d04-4da7-a6e2-5119a6debc38"
@@ -272,6 +273,21 @@ Output ONLY the feedback text.
     let content = await callSambaNova(prompt)
     setFeedback(content)
     setStep("result")
+
+    // Store writing attempt in Supabase
+    await supabase.from('writing_attempts').insert([
+      {
+        subject: selectedSubject,
+        chapter: selectedChapter,
+        topic: selectedTopic,
+        difficulty: selectedDifficulty,
+        question,
+        model_answer: modelAnswer,
+        user_answer: userAnswer,
+        feedback: content,
+        timestamp: new Date().toISOString(),
+      }
+    ])
   } catch (err: any) {
     console.error(err)
     alert("Failed to evaluate answer:\n" + err.message)

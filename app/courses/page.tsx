@@ -25,6 +25,7 @@ import { Navbar } from "@/components/navbar"
 import { Textarea } from "@/components/ui/textarea"
 import { askGroqAI, generateCourseContent } from "@/lib/groq-ai"
 import { useEnhancedVoice } from "@/components/enhanced-voice"
+import { supabase } from '@/lib/supabaseClient';
 
 interface Subject {
   id: string
@@ -713,6 +714,18 @@ This is a comprehensive topic covering important concepts in ${topicName}.
 
       setChatMessages((prev) => [...prev, aiResponse])
       setIsAiTyping(false)
+
+      // Store chat in Supabase
+      await supabase.from('course_chats').insert([
+        {
+          subject: selectedSubject?.name,
+          chapter: selectedChapter?.name,
+          topic: selectedTopic?.name,
+          user_message: currentInput,
+          ai_response: aiResponseContent,
+          timestamp: new Date().toISOString(),
+        }
+      ])
 
       // Determine emotion based on response content
       let emotion: "friendly" | "encouraging" | "explaining" | "excited" = "friendly"

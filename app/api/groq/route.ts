@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabase } from '@/lib/supabaseClient';
 
 function cleanJSON(content: string): string {
   let clean = content.trim();
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
   let model = "llama-3.3-70b-versatile";
+
+  const timestamp = new Date().toISOString();
 
   if (type === "content") {
     let prompt = `You are an expert educator creating comprehensive study material for the topic "${topic}" in ${subject} for Class 9 students.`;
@@ -51,6 +54,12 @@ export async function POST(req: NextRequest) {
     if (!content) {
       return NextResponse.json({ error: "Empty AI response" }, { status: 500 });
     }
+    // Store interaction in Supabase
+    await supabase.from('interactions').insert([
+      {
+        type: 'content', subject, topic, chapter, difficulty, language, question: null, response: content, timestamp
+      }
+    ]);
     return NextResponse.json({ content });
   }
 
@@ -88,6 +97,12 @@ export async function POST(req: NextRequest) {
     if (!content) {
       return NextResponse.json({ error: "Empty AI response" }, { status: 500 });
     }
+    // Store interaction in Supabase
+    await supabase.from('interactions').insert([
+      {
+        type: 'chat', subject, topic, chapter, difficulty, language, question, response: content, timestamp
+      }
+    ]);
     return NextResponse.json({ content });
   }
 
@@ -125,6 +140,12 @@ export async function POST(req: NextRequest) {
     try {
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed)) {
+        // Store interaction in Supabase
+        await supabase.from('interactions').insert([
+          {
+            type: 'questions', subject, topic, chapter, difficulty, language, question: null, response: JSON.stringify(parsed), timestamp
+          }
+        ]);
         return NextResponse.json(parsed);
       } else {
         return NextResponse.json({ error: "AI did not return a JSON array." }, { status: 500 });
