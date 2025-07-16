@@ -69,7 +69,7 @@ export default function LoginPage() {
               <path d="M12 20L20 12L28 20" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M12 28L20 20L28 28" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="ml-2 text-2xl font-bold text-gray-900">SmartSave</span>
+            <span className="ml-2 text-2xl font-bold text-gray-900">AlfaNumrik</span>
           </div>
 
           {/* Welcome */}
@@ -95,7 +95,7 @@ export default function LoginPage() {
                   : "text-gray-600 hover:bg-gray-200"
               }`}
             >
-              Sign In
+              Log In
             </button>
             <button
               type="button"
@@ -189,7 +189,7 @@ export default function LoginPage() {
 
           {/* Footer */}
           <p className="text-xs text-gray-400 text-center">
-            Join the millions of smart investors who trust us to manage their finances. Login to access your personalized dashboard, track your portfolio performance, and make informed investment decisions.
+          Join thousands of motivated students using our AI-powered platform to stay ahead in their studies. Log in to access personalized learning paths, track your progress, and prepare smarter for every exam.
           </p>
         </div>
 
