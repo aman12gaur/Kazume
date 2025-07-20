@@ -22,9 +22,18 @@ export default function LoginPage() {
     const form = e.currentTarget;
     const email = (form.elements.namedItem("email") as HTMLInputElement).value;
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
+    const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
+    const mobile = (form.elements.namedItem("mobile") as HTMLInputElement)?.value;
 
     if (mode === "signup") {
-      const { error, data } = await supabase.auth.signUp({ email, password });
+      // Pass name and mobile as user_metadata if supported by your Supabase setup
+      const { error, data } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name, mobile },
+        },
+      });
       if (error) {
         setError(error.message);
       } else {
@@ -32,7 +41,7 @@ export default function LoginPage() {
         setTimeout(() => {
           setShowVerificationMessage(false);
           setMode("signin");
-        }, 5000);
+        }, 3000);
       }
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -45,16 +54,29 @@ export default function LoginPage() {
           setError(error.message);
         }
       } else if (data && data.user) {
-        // Store user info in localStorage for dashboard
-        const userEmail = data.user.email || "User";
+        // Fetch the user's name from metadata if available
+        let userName = data.user.user_metadata?.name;
+        if (!userName) {
+          // If not in metadata, fallback to email prefix
+          userName = (data.user.email || "User").split("@")[0];
+        }
         const userObj = {
-          name: userEmail.split("@")[0],
+          name: userName,
           id: data.user.id,
         };
         localStorage.setItem("gyaan_user", JSON.stringify(userObj));
         router.push("/dashboard");
       }
     }
+  }
+
+  async function handleGoogleLogin() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+      },
+    });
   }
 
   return (
@@ -112,14 +134,48 @@ export default function LoginPage() {
 
           {/* Form */}
           {showVerificationMessage ? (
-            <div>
-              <p>Verification email sent. Please check your inbox.</p>
-              <button onClick={() => { setShowVerificationMessage(false); setMode("signin"); }}>
+            <div className="text-center">
+              <p className="mb-4">Verification email sent. Please check your inbox.</p>
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => { setShowVerificationMessage(false); setMode("signin"); }}
+              >
                 Go to Sign In
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 w-full">
+              {mode === "signup" && (
+                <>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/></svg>
+                    </span>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      required
+                      placeholder="Full Name"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    />
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z"/><path d="M16 3v2M8 3v2M3 9h18"/></svg>
+                    </span>
+                    <input
+                      id="mobile"
+                      name="mobile"
+                      type="tel"
+                      required
+                      pattern="[0-9]{10,15}"
+                      placeholder="Mobile Phone Number"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    />
+                  </div>
+                </>
+              )}
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -175,17 +231,32 @@ export default function LoginPage() {
             <span className="mx-3 text-gray-400 text-sm">Or Continue With</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
-          <div className="flex justify-center gap-4 mb-6">
-            <button className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition">
-              <img src="https://unsplash.com/photos/young-professional-photographer-working-on-tablet-in-creative-workplace-NNLxyZUqLR0" alt="Google" className="w-5 h-5" />
-            </button>
-            <button className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition">
-              <svg width="20" height="20" fill="currentColor" className="text-black" viewBox="0 0 20 20"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 14.5A6.5 6.5 0 1 1 10 3.5a6.5 6.5 0 0 1 0 13zm0-10.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>
-            </button>
-            <button className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition">
-              <svg width="20" height="20" fill="currentColor" className="text-blue-900" viewBox="0 0 20 20"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm2.5 7.5h-1V7a1 1 0 0 0-2 0v2.5h-1A.5.5 0 0 0 8 10v1a.5.5 0 0 0 .5.5h1V13a1 1 0 0 0 2 0v-1.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/></svg>
+
+          {/* Google Login Button (moved below divider) */}
+          <div className="flex justify-center gap-4 mb-6 mt-0 w-full">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-100 transition shadow-sm"
+            >
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clipPath="url(#clip0_17_40)">
+                  <path d="M47.5 24.5C47.5 22.6 47.3 20.8 47 19H24V29.5H37.5C36.8 33.1 34.2 36.1 30.7 37.9V44H38.2C43.1 39.5 47.5 32.8 47.5 24.5Z" fill="#4285F4"/>
+                  <path d="M24 48C30.6 48 36.2 45.8 40.2 42.2L32.7 36.1C30.6 37.4 28 38.2 24 38.2C18.7 38.2 14.1 34.7 12.5 30.1H4.7V36.4C8.7 43.1 15.7 48 24 48Z" fill="#34A853"/>
+                  <path d="M12.5 30.1C11.9 28.4 11.5 26.6 11.5 24.7C11.5 22.8 11.9 21 12.5 19.3V13H4.7C2.7 16.6 1.5 20.6 1.5 24.7C1.5 28.8 2.7 32.8 4.7 36.4L12.5 30.1Z" fill="#FBBC05"/>
+                  <path d="M24 11.8C27.2 11.8 29.7 13 31.3 14.5L38.3 7.5C36.2 5.5 30.6 2 24 2C15.7 2 8.7 6.9 4.7 13L12.5 19.3C14.1 14.7 18.7 11.8 24 11.8Z" fill="#EA4335"/>
+                </g>
+                <defs>
+                  <clipPath id="clip0_17_40">
+                    <rect width="48" height="48" fill="white"/>
+                  </clipPath>
+                </defs>
+              </svg>
+              Continue with Google
             </button>
           </div>
+
+          {/* Removed the three icon buttons below divider */}
 
           {/* Footer */}
           <p className="text-xs text-gray-400 text-center">

@@ -54,7 +54,7 @@ export default function Dashboard() {
       <main className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Hi {user.name}, Welcome Back to Gyaan! 👋</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Hi {user.name.split(' ')[0]}, Welcome Back to AlfaNumrik! 👋</h1>
           <p className="text-gray-600">Continue your learning journey and track your progress</p>
         </div>
 

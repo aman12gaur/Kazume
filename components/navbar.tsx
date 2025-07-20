@@ -41,7 +41,7 @@ export function Navbar() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <Brain className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">Gyaan</span>
+            <span className="text-xl font-bold text-gray-900">AlfaNumrik</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -71,7 +71,7 @@ export function Navbar() {
             {user && (
               <div className="text-sm">
                 <span className="text-gray-600">Welcome, </span>
-                <span className="font-medium">{user.name}</span>
+                <span className="font-medium">{user.name.split(' ')[0]}</span>
               </div>
             )}
             <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -119,7 +119,7 @@ export function Navbar() {
                 {user && (
                   <div className="text-sm mb-3 px-3">
                     <span className="text-gray-600">Welcome, </span>
-                    <span className="font-medium">{user.name}</span>
+                    <span className="font-medium">{user.name.split(' ')[0]}</span>
                   </div>
                 )}
                 <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" onClick={handleLogout}>

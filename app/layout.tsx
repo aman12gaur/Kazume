@@ -6,7 +6,7 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Gyaan - AI-Powered Learning Platform",
+  title: "AlfaNumrik - AI-Learning Platform",
   description:
     "Master Class 9 with interactive courses, AI doubt resolution, and personalized quizzes for Math, Science, SST, and English.",
     generator: 'v0.dev'

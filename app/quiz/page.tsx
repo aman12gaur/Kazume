@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -296,6 +296,24 @@ export default function QuizPage() {
   const [startTime, setStartTime] = useState<Date | null>(null)
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
   const [isUsingAI, setIsUsingAI] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'bot', text: string }[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const selectionRef = useRef<HTMLDivElement>(null)
+
+  // Scroll chat to bottom when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [chatMessages])
+
+  // Scroll to top of selection when topic changes
+  useEffect(() => {
+    if (selectionRef.current) {
+      selectionRef.current.scrollTo({ top: 0, behavior: "smooth" })
+    }
+  }, [selectedTopic])
 
   const subjects = Object.values(courseData)
   const difficulties = [
@@ -497,90 +515,92 @@ export default function QuizPage() {
 
               <CardContent className="space-y-6">
                 {/* Subject selection */}
-                <div>
-                  <Label className="text-base font-medium">Select Subject</Label>
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    {subjects.map((subject) => (
-                      <Button
-                        key={subject.id}
-                        variant={selectedSubject === subject.name ? "default" : "outline"}
-                        className="h-auto p-4 justify-start"
-                        onClick={() => {
-                          setSelectedSubject(subject.name)
-                          setSelectedChapter("")
-                          setSelectedTopic("")
-                          setSelectedDifficulty("")
-                        }}
-                      >
-                        <div className="text-left">
-                          <div className="font-medium">{subject.name}</div>
-                          <div className="text-xs text-muted-foreground">10 questions</div>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Chapter, Topic, Difficulty selectors */}
-                {selectedSubject && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-base font-medium">Select Chapter</Label>
-                      <div className="grid grid-cols-1 gap-2 mt-2">
-                        {getChapters().map((chapter) => (
-                          <Button
-                            key={chapter.id}
-                            variant={selectedChapter === chapter.name ? "default" : "outline"}
-                            onClick={() => {
-                              setSelectedChapter(chapter.name)
-                              setSelectedTopic("") // clear topic on chapter change
-                              setSelectedDifficulty("")
-                            }}
-                          >
-                            {chapter.name}
-                          </Button>
-                        ))}
-                      </div>
+                <div ref={selectionRef} style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  <div>
+                    <Label className="text-base font-medium">Select Subject</Label>
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      {subjects.map((subject) => (
+                        <Button
+                          key={subject.id}
+                          variant={selectedSubject === subject.name ? "default" : "outline"}
+                          className="h-auto p-4 justify-start"
+                          onClick={() => {
+                            setSelectedSubject(subject.name)
+                            setSelectedChapter("")
+                            setSelectedTopic("")
+                            setSelectedDifficulty("")
+                          }}
+                        >
+                          <div className="text-left">
+                            <div className="font-medium">{subject.name}</div>
+                            <div className="text-xs text-muted-foreground">10 questions</div>
+                          </div>
+                        </Button>
+                      ))}
                     </div>
+                  </div>
 
-                    {selectedChapter && (
+                  {/* Chapter, Topic, Difficulty selectors */}
+                  {selectedSubject && (
+                    <div className="space-y-4">
                       <div>
-                        <Label className="text-base font-medium">Select Topic</Label>
+                        <Label className="text-base font-medium">Select Chapter</Label>
                         <div className="grid grid-cols-1 gap-2 mt-2">
-                          {getTopics().map((topic) => (
+                          {getChapters().map((chapter) => (
                             <Button
-                              key={topic.id}
-                              variant={selectedTopic === topic.name ? "default" : "outline"}
+                              key={chapter.id}
+                              variant={selectedChapter === chapter.name ? "default" : "outline"}
                               onClick={() => {
-                                setSelectedTopic(topic.name)
+                                setSelectedChapter(chapter.name)
+                                setSelectedTopic("") // clear topic on chapter change
                                 setSelectedDifficulty("")
                               }}
                             >
-                              {topic.name}
+                              {chapter.name}
                             </Button>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {selectedTopic && (
-                      <div>
-                        <Label className="text-base font-medium">Select Difficulty</Label>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                          {difficulties.map((d) => (
-                            <Button
-                              key={d.value}
-                              variant={selectedDifficulty === d.value ? "default" : "outline"}
-                              onClick={() => setSelectedDifficulty(d.value)}
-                            >
-                              {d.label}
-                            </Button>
-                          ))}
+                      {selectedChapter && (
+                        <div>
+                          <Label className="text-base font-medium">Select Topic</Label>
+                          <div className="grid grid-cols-1 gap-2 mt-2">
+                            {getTopics().map((topic) => (
+                              <Button
+                                key={topic.id}
+                                variant={selectedTopic === topic.name ? "default" : "outline"}
+                                onClick={() => {
+                                  setSelectedTopic(topic.name)
+                                  setSelectedDifficulty("")
+                                }}
+                              >
+                                {topic.name}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+
+                      {selectedTopic && (
+                        <div>
+                          <Label className="text-base font-medium">Select Difficulty</Label>
+                          <div className="grid grid-cols-3 gap-2 mt-2">
+                            {difficulties.map((d) => (
+                              <Button
+                                key={d.value}
+                                variant={selectedDifficulty === d.value ? "default" : "outline"}
+                                onClick={() => setSelectedDifficulty(d.value)}
+                              >
+                                {d.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Quiz details info box */}
                 <div className="bg-blue-50 p-4 rounded-lg">
@@ -606,6 +626,39 @@ export default function QuizPage() {
                   <Play className="w-5 h-5 mr-2" />
                   Start Quiz
                 </Button>
+              </CardContent>
+            </Card>
+            {/* Chatbot UI */}
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle>Quiz Chatbot</CardTitle>
+                <CardDescription>Ask any quiz-related question!</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div style={{ height: 240, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#f9fafb', marginBottom: 12 }}>
+                  {chatMessages.map((msg, idx) => (
+                    <div key={idx} style={{ textAlign: msg.role === 'user' ? 'right' : 'left', margin: '4px 0' }}>
+                      <span style={{ background: msg.role === 'user' ? '#2563eb' : '#e5e7eb', color: msg.role === 'user' ? '#fff' : '#111', borderRadius: 8, padding: '6px 12px', display: 'inline-block', maxWidth: '80%' }}>{msg.text}</span>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <form onSubmit={e => {
+                  e.preventDefault();
+                  if (!chatInput.trim()) return;
+                  setChatMessages(msgs => [...msgs, { role: 'user', text: chatInput }]);
+                  // Simulate bot reply
+                  setTimeout(() => setChatMessages(msgs => [...msgs, { role: 'bot', text: 'This is a sample bot reply.' }]), 600);
+                  setChatInput("");
+                }} className="flex gap-2">
+                  <input
+                    className="flex-1 border rounded px-3 py-2"
+                    placeholder="Type your message..."
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                  />
+                  <Button type="submit">Send</Button>
+                </form>
               </CardContent>
             </Card>
           </div>
