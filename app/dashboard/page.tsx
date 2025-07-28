@@ -9,244 +9,254 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Brain, Trophy, TrendingUp, Clock, Target, Play, MessageCircle, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
+import { useUserMetrics } from '@/hooks/useUserMetrics';
 
-interface DashboardStats {
-  quizzesAttempted: number
-  totalQuestions: number
-  currentStreak: number
-  lastCompletedTopic: string
-  weeklyProgress: number[]
-  subjectProgress: { subject: string; progress: number; color: string }[]
+interface User {
+  id: string;
+  name: string;
+  email: string;
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<{ name: string; id: string } | null>(null)
-  const [stats, setStats] = useState<DashboardStats>({
-    quizzesAttempted: 12,
-    totalQuestions: 156,
-    currentStreak: 5,
-    lastCompletedTopic: "Rational Numbers - Mathematics",
-    weeklyProgress: [65, 72, 68, 85, 78, 92, 88],
-    subjectProgress: [
-      { subject: "Mathematics", progress: 78, color: "bg-blue-500" },
-      { subject: "Science", progress: 65, color: "bg-green-500" },
-      { subject: "Social Studies", progress: 82, color: "bg-purple-500" },
-      { subject: "English", progress: 71, color: "bg-orange-500" },
-    ],
-  })
-  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
+  // Get user from localStorage and fetch user data
   useEffect(() => {
-    const userData = localStorage.getItem("gyaan_user")
+    const userData = localStorage.getItem('gyaan_user');
     if (!userData) {
-      router.push("/")
-      return
+      // Set default test user for demo
+      const defaultUser = { id: "5d23c823-d199-4b6c-9983-1b909a14f3aa", name: "Aman Gaur", email: "aman.gaur5505@gmail.com" };
+      localStorage.setItem('gyaan_user', JSON.stringify(defaultUser));
+      setUser(defaultUser);
+      setUserLoading(false);
+      return;
     }
-    setUser(JSON.parse(userData))
-  }, [router])
 
-  if (!user) return null
+    const parsedUser = JSON.parse(userData);
+    if (!parsedUser.id) {
+      setUserLoading(false);
+      return;
+    }
+
+    // Use localStorage data directly to avoid API issues
+    setUser(parsedUser);
+    setUserLoading(false);
+  }, []);
+
+  const {
+    quizzesAttempted,
+    totalQuestions,
+    currentStreak,
+    weeklyProgress,
+    subjectProgress,
+    recentQuizzes,
+    overallStats,
+    quizzesDeltaLastWeek,
+    questionsDeltaYesterday,
+    loading: metricsLoading,
+    error: metricsError,
+    refetch,
+  } = useUserMetrics(user?.id || null);
+
+  // Refetch metrics when returning to dashboard
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [refetch]);
+
+  // Redirect if no user
+  useEffect(() => {
+    if (!userLoading && !user) {
+      router.push('/');
+      return;
+    }
+  }, [router, user, userLoading]);
+
+  if (userLoading || metricsLoading) {
+    return <div className="p-8 text-center">Loading...</div>;
+  }
+
+  if (error || metricsError) {
+    return <div className="p-8 text-center text-red-500">{error || metricsError}</div>;
+  }
+
+  // For lastCompletedTopic, you may want to fetch from another source or compute from quiz_results
+  const lastCompletedTopic = 'See Progress Page';
+
+  // Format duration as HH:MM:SS
+  function formatDuration(sec: number) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <main className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Hi {user.name.split(' ')[0]}, Welcome Back to AlfaNumrik! 👋</h1>
-          <p className="text-gray-600">Continue your learning journey and track your progress</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Hi {user?.name || 'Student'}! 👋
+          </h1>
+          <p className="text-gray-600">
+            Ready to continue your learning journey?
+          </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Quizzes Attempted</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.quizzesAttempted}</div>
-              <p className="text-xs text-muted-foreground">+2 from last week</p>
+              <div className="text-2xl font-bold">{quizzesAttempted}</div>
+              <p className="text-xs text-muted-foreground">+{quizzesDeltaLastWeek} from last week</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Questions Solved</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Questions Attempted</CardTitle>
+              <Brain className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalQuestions}</div>
-              <p className="text-xs text-muted-foreground">+23 from yesterday</p>
+              <div className="text-2xl font-bold">{totalQuestions}</div>
+              <p className="text-xs text-muted-foreground">+{questionsDeltaYesterday} from yesterday</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.currentStreak} days</div>
-              <p className="text-xs text-muted-foreground">Keep it up! 🔥</p>
+              <div className="text-2xl font-bold">{currentStreak}</div>
+              <p className="text-xs text-muted-foreground">days in a row</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Study Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2.5h</div>
-              <p className="text-xs text-muted-foreground">Today's session</p>
+              <div className="text-2xl font-bold">{overallStats.averageScore}%</div>
+              <p className="text-xs text-muted-foreground">across all subjects</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Today's Activity */}
-            <Card>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Link href="/quiz">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="w-5 h-5" />
-                  Today's Activity
+                <CardTitle className="flex items-center">
+                  <Play className="h-5 w-5 mr-2" />
+                  Take a Quiz
                 </CardTitle>
+                <CardDescription>
+                  Test your knowledge with interactive quizzes
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <div>
-                    <h3 className="font-medium">Continue Last Topic</h3>
-                    <p className="text-sm text-gray-600">{stats.lastCompletedTopic}</p>
-                  </div>
-                  <Button asChild>
-                    <Link href="/courses">Continue</Link>
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-auto p-4 justify-start bg-transparent" asChild>
-                    <Link href="/quiz">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Trophy className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-medium">Take Today's Quiz</div>
-                          <div className="text-sm text-gray-500">Mathematics - Algebra</div>
-                        </div>
-                      </div>
-                    </Link>
-                  </Button>
-
-                  <Button variant="outline" className="h-auto p-4 justify-start bg-transparent" asChild>
-                    <Link href="/courses">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <MessageCircle className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-medium">Ask a Doubt</div>
-                          <div className="text-sm text-gray-500">AI Chatbot with Voice</div>
-                        </div>
-                      </div>
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
             </Card>
+          </Link>
 
-            {/* Subject Progress */}
-            <Card>
+          <Link href="/courses">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  Subject-wise Progress
+                <CardTitle className="flex items-center">
+                  <BookOpen className="h-5 w-5 mr-2" />
+                  Study Material
                 </CardTitle>
+                <CardDescription>
+                  Access comprehensive study resources
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {stats.subjectProgress.map((subject, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{subject.subject}</span>
-                      <Badge variant="secondary">{subject.progress}%</Badge>
+            </Card>
+          </Link>
+
+          <Link href="/progress">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  View Progress
+                </CardTitle>
+                <CardDescription>
+                  Track your learning journey
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Quizzes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentQuizzes.length > 0 ? (
+                <div className="space-y-3">
+                  {recentQuizzes.map((quiz, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium">{quiz.subject}</p>
+                        <p className="text-sm text-gray-600">{quiz.chapter}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">{quiz.score}%</p>
+                        <p className="text-xs text-gray-600">{quiz.date}</p>
+                      </div>
                     </div>
-                    <Progress value={subject.progress} className="h-2" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">No recent quizzes</p>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Jump to your favorite activities</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
-                  <Link href="/courses">
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Browse Courses
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
-                  <Link href="/quiz">
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Start Quiz
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
-                  <Link href="/progress">
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    View Progress
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
-                  <Link href="/courses">
-                    <Brain className="w-4 h-4 mr-2" />
-                    AI Doubt Bot
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Recent Achievements */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Achievements</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-                  <Trophy className="w-8 h-8 text-yellow-600" />
-                  <div>
-                    <div className="font-medium">Quiz Master</div>
-                    <div className="text-sm text-gray-600">Scored 90% in Math Quiz</div>
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Subject Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {subjectProgress.length > 0 ? (
+                <div className="space-y-4">
+                  {subjectProgress.map((subject, index) => (
+                    <div key={index}>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-medium">{subject.subject}</span>
+                        <span className="text-sm text-gray-600">{subject.progress}%</span>
+                      </div>
+                      <Progress value={subject.progress} className="h-2" />
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                  <Target className="w-8 h-8 text-green-600" />
-                  <div>
-                    <div className="font-medium">Streak Champion</div>
-                    <div className="text-sm text-gray-600">5 days learning streak</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                  <BookOpen className="w-8 h-8 text-blue-600" />
-                  <div>
-                    <div className="font-medium">Chapter Complete</div>
-                    <div className="text-sm text-gray-600">Finished Number Systems</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">No subject data available</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

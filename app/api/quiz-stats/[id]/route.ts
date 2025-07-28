@@ -9,31 +9,30 @@ export async function GET(
     const { id } = await params;
     
     if (!id) {
-      console.error('User ID not provided in route params.');
       return NextResponse.json({ error: 'User ID not provided' }, { status: 400 });
     }
 
     const supabase = await createClient();
     
+    // Fetch quiz results for the user
     const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
+      .from('quiz_results')
+      .select('total_questions')
+      .eq('user_id', id);
 
     if (error) {
       console.error('Supabase error:', error.message);
-      if (error.message.includes('No rows found')) {
-        return NextResponse.json({ error: 'User not found.' }, { status: 404 });
-      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (!data) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 });
-    }
+    // Calculate stats
+    const quizzesAttempted = data.length;
+    const totalQuestions = data.reduce((sum, row) => sum + (row.total_questions || 0), 0);
 
-    return NextResponse.json(data);
+    return NextResponse.json({
+      quizzesAttempted,
+      totalQuestions
+    });
   } catch (error) {
     console.error('API route error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

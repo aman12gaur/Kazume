@@ -20,7 +20,7 @@ export async function signup(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -30,6 +30,19 @@ export async function signup(formData: FormData) {
   if (error) {
     throw new Error(error.message)
   }
-  // Optionally, insert into user table here
+  // Insert into users table if not already present
+  const user = data?.user;
+  if (user) {
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    if (!existing) {
+      await supabase.from('users').insert([
+        { id: user.id, email: user.email }
+      ])
+    }
+  }
   redirect('/login?signup=success')
 } 

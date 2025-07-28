@@ -25,6 +25,7 @@ interface Question {
   chapter: string
   topic?: string
   difficulty: string
+  source?: string // Added for fallback questions
 }
 
 interface QuizResult {
@@ -173,6 +174,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "English",
         chapter: "Grammar",
         difficulty: "easy",
+        source: "fallback",
       },
       {
         id: "eng2",
@@ -183,6 +185,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "English",
         chapter: "Tenses",
         difficulty: "easy",
+        source: "fallback",
       },
     ],
     math: [
@@ -196,6 +199,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Mathematics",
         chapter: "Number Systems",
         difficulty: "medium",
+        source: "fallback",
       },
       {
         id: "math2",
@@ -206,6 +210,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Mathematics",
         chapter: "Polynomials",
         difficulty: "medium",
+        source: "fallback",
       },
     ],
     science: [
@@ -219,6 +224,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Science",
         chapter: "Matter in Our Surroundings",
         difficulty: "easy",
+        source: "fallback",
       },
       {
         id: "sci2",
@@ -229,6 +235,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Science",
         chapter: "Force and Laws of Motion",
         difficulty: "easy",
+        source: "fallback",
       },
     ],
     sst: [
@@ -241,6 +248,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Social Studies",
         chapter: "The French Revolution",
         difficulty: "medium",
+        source: "fallback",
       },
       {
         id: "sst2",
@@ -251,6 +259,7 @@ const getFallbackQuestions = (subject: string): Question[] => {
         subject: "Social Studies",
         chapter: "Constitutional Design",
         difficulty: "easy",
+        source: "fallback",
       },
     ],
   }
@@ -261,6 +270,19 @@ const getFallbackQuestions = (subject: string): Question[] => {
 // Use this if you need UUID (browser-safe polyfill)
 function makeId() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
+// Helper to check if a string is a valid UUID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+// Helper to generate a UUID (v4, browser-safe)
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c: string) {
+    const r = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 // 👇 Replace your entire callLLMAPI with this function
@@ -300,6 +322,14 @@ export default function QuizPage() {
   const [chatInput, setChatInput] = useState("")
   const chatEndRef = useRef<HTMLDivElement>(null)
   const selectionRef = useRef<HTMLDivElement>(null)
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Always fetch the current user's UID from Supabase Auth on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
 
   // Scroll chat to bottom when messages change
   useEffect(() => {
@@ -466,22 +496,69 @@ export default function QuizPage() {
     setQuizState("completed")
 
     // Store result in Supabase
-    await supabase.from('quiz_results').insert([
+    // userId is always the Supabase Auth UID
+    if (!userId) {
+      alert('You must be logged in to save quiz results.');
+      return;
+    }
+    // Insert into quiz_results (main summary)
+    const { data: quizResultInsert, error: quizResultError } = await supabase.from('quiz_results').insert([
       {
-        subject: selectedSubject,
-        chapter: selectedChapter,
-        topic: selectedTopic,
-        difficulty: selectedDifficulty,
+        user_id: userId, // Always use Supabase Auth UID
+        chapter: selectedChapter || '',
         score: result.score,
         total_questions: result.totalQuestions,
         correct_answers: result.correctAnswers,
         wrong_answers: result.wrongAnswers,
-        time_taken: result.timeTaken,
-        answers: JSON.stringify(result.answers),
-        is_using_ai: isUsingAI,
-        timestamp: new Date().toISOString(),
+        time_taken: timeTaken, // timeTaken is already seconds (int)
       }
-    ])
+    ]).select('id').single();
+
+    if (quizResultError) {
+      console.error('Error saving quiz result:', quizResultError.message || quizResultError);
+      alert('Failed to save your quiz result. Please try again.');
+      return;
+    }
+
+    // Insert answers into quiz_answers table (one row per answer)
+    if (quizResultInsert && quizResultInsert.id) {
+      const preparedAnswers = [];
+      for (const a of result.answers) {
+        if (a.questionId && a.selectedAnswer !== undefined && a.selectedAnswer !== null) {
+          let questionId = a.questionId;
+          const fallbackQ = currentQuestions.find(q => q.id === a.questionId);
+          // If not a valid UUID, treat as fallback and do NOT insert into quiz_questions
+          const isFallback = !isValidUUID(questionId) || (fallbackQ && fallbackQ.source === 'fallback');
+          if (isFallback) {
+            // Save answer with question_id null, and raw question text
+            preparedAnswers.push({
+              quiz_result_id: quizResultInsert.id,
+              question_id: null,
+              selected_answer: a.selectedAnswer,
+              is_correct: a.isCorrect,
+              question_text: fallbackQ ? fallbackQ.question : null,
+              // Optionally: source: 'fallback',
+            });
+            continue;
+          }
+          // Otherwise, insert answer with valid question_id
+          preparedAnswers.push({
+            quiz_result_id: quizResultInsert.id,
+            question_id: questionId,
+            selected_answer: a.selectedAnswer,
+            is_correct: a.isCorrect,
+            question_text: null,
+          });
+        }
+      }
+      if (preparedAnswers.length > 0) {
+        const { error: answersError } = await supabase.from('quiz_answers').insert(preparedAnswers);
+        if (answersError) {
+          console.error('Error saving quiz answers:', answersError.message || answersError);
+          alert('Failed to save your quiz answers. Please try again.');
+        }
+      }
+    }
   }
 
   const resetQuiz = () => {

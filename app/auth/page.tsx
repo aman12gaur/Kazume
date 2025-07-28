@@ -39,9 +39,9 @@ export default function AuthPage() {
       if (error) setMessage(error.message);
       else setMessage("Check your email for a login link or verification.");
     } else {
-      // Check if email already exists in user table
+      // Check if email already exists in users table
       const { data: existing, error: selectError } = await supabase
-        .from('user')
+        .from('users')
         .select('email')
         .eq('email', email)
         .single();
@@ -51,7 +51,7 @@ export default function AuthPage() {
         return;
       }
       // Sign up with email verification
-      const { error } = await supabase.auth.signUp({
+      const { data: signupData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -61,14 +61,33 @@ export default function AuthPage() {
       if (error) {
         setMessage(error.message);
       } else {
-        // Insert email into user table
-        const { error: insertError } = await supabase
-          .from('user')
-          .insert([{ email }]);
-        if (insertError) {
-          setMessage("Failed to save user to database: " + insertError.message);
+        // Insert user into users table with UID
+        let uid = signupData?.user?.id;
+        if (!uid) {
+          // If UID not in response, fetch user
+          const { data: userData } = await supabase.auth.getUser();
+          uid = userData?.user?.id;
+        }
+        if (uid) {
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', uid)
+            .single();
+          if (!existingUser) {
+            const { error: insertError } = await supabase
+              .from('users')
+              .insert([{ id: uid, email }]);
+            if (insertError) {
+              setMessage("Failed to save user to database: " + insertError.message);
+            } else {
+              setMessage("Check your email to verify your account before logging in.");
+            }
+          } else {
+            setMessage("Check your email to verify your account before logging in.");
+          }
         } else {
-          setMessage("Check your email to verify your account before logging in.");
+          setMessage("Could not get user ID after signup.");
         }
       }
     }
