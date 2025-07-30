@@ -10,6 +10,7 @@ import { BookOpen, Brain, Trophy, TrendingUp, Clock, Target, Play, MessageCircle
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { useUserMetrics } from '@/hooks/useUserMetrics';
+import { createClient } from "@/lib/supabaseBrowserClient";
 
 interface User {
   id: string;
@@ -27,11 +28,35 @@ export default function Dashboard() {
   useEffect(() => {
     const userData = localStorage.getItem('gyaan_user');
     if (!userData) {
-      // Set default test user for demo
-      const defaultUser = { id: "5d23c823-d199-4b6c-9983-1b909a14f3aa", name: "Aman Gaur", email: "aman.gaur5505@gmail.com" };
-      localStorage.setItem('gyaan_user', JSON.stringify(defaultUser));
-      setUser(defaultUser);
-      setUserLoading(false);
+      // Check if user is authenticated via Supabase
+      const checkSupabaseUser = async () => {
+        try {
+          const supabase = createClient();
+          const { data: { user }, error } = await supabase.auth.getUser();
+          
+          if (user && !error) {
+            const userObj = {
+              id: user.id,
+              name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+              email: user.email || ''
+            };
+            localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+            setUser(userObj);
+            setUserLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking Supabase user:', error);
+        }
+        
+        // Fallback to default user for demo
+        const defaultUser = { id: "5d23c823-d199-4b6c-9983-1b909a14f3aa", name: "Aman Gaur", email: "aman.gaur5505@gmail.com" };
+        localStorage.setItem('gyaan_user', JSON.stringify(defaultUser));
+        setUser(defaultUser);
+        setUserLoading(false);
+      };
+      
+      checkSupabaseUser();
       return;
     }
 

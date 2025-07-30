@@ -74,7 +74,11 @@ export default function LoginPage() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth` : undefined,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
   }
@@ -222,6 +226,17 @@ export default function LoginPage() {
               >
                 Continue
               </button>
+              
+              {mode === "signin" && (
+                <div className="text-center mt-4">
+                  <a 
+                    href="/auth/reset-password" 
+                    className="text-blue-600 text-sm font-medium hover:underline"
+                  >
+                    Forgot your password?
+                  </a>
+                </div>
+              )}
             </form>
           )}
 
