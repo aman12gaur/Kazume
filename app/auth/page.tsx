@@ -4,7 +4,8 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabaseBrowserClient";
 
-export default function AuthPage() {
+// Client component that handles search params
+function AuthContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,7 +47,9 @@ export default function AuthPage() {
               name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User',
               email: data.user.email
             };
-            localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+            }
             
             // Clear the URL fragment and redirect to dashboard
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -70,7 +73,9 @@ export default function AuthPage() {
             name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User',
             email: data.user.email
           };
-          localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+          }
           router.replace("/dashboard");
         } else {
           setIsVerified(false);
@@ -106,7 +111,7 @@ export default function AuthPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth` // redirect to auth page after verification
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth` : undefined
         }
       });
       if (error) {
@@ -166,7 +171,7 @@ export default function AuthPage() {
   };
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <>
       {user && isVerified ? (
         <div style={{ maxWidth: 400, margin: "80px auto", padding: 24, border: "1px solid #eee", borderRadius: 8 }}>
           <h2 style={{ textAlign: "center", marginBottom: 24 }}>Welcome, {user.email}</h2>
@@ -260,6 +265,18 @@ export default function AuthPage() {
           {message && <div style={{ marginTop: 16, color: "#b91c1c", textAlign: "center" }}>{message}</div>}
         </div>
       )}
+    </>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ maxWidth: 400, margin: "80px auto", padding: 24, border: "1px solid #eee", borderRadius: 8 }}>
+        <div style={{ textAlign: "center" }}>Loading...</div>
+      </div>
+    }>
+      <AuthContent />
     </Suspense>
   );
 } 
