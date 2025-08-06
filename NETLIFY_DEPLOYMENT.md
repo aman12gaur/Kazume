@@ -33,8 +33,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ## What Changed
 
 1. **Created `netlify.toml`** - Configuration file for Netlify
-2. **Created Netlify Function** - `netlify/functions/api/groq.js` replaces the Next.js API route
-3. **Added redirects** - Routes `/api/*` requests to Netlify Functions
+2. **Created Netlify Functions** - Replace Next.js API routes:
+   - `netlify/functions/api/groq.js` - Handles Groq AI API calls
+   - `netlify/functions/api/study-sessions.js` - Handles study sessions
+   - `netlify/functions/api/achievements.js` - Handles achievements
+   - `netlify/functions/api/user/[id].js` - Handles user data
+   - `netlify/functions/api/quiz-stats/[id].js` - Handles quiz statistics
+3. **Updated hooks** - Modified `useStudySession` to use API functions
+4. **Added redirects** - Routes `/api/*` requests to Netlify Functions
 
 ## How It Works
 
@@ -53,12 +59,94 @@ After deployment:
 
 ## Troubleshooting
 
-If you still get errors:
-1. Check Netlify Function logs in the dashboard
-2. Verify environment variables are set correctly
-3. Ensure the function is being called (check network tab)
-4. Check that Supabase credentials are correct
+### If you still get 404 errors:
+
+1. **Check Netlify Function logs:**
+   - Go to Netlify Dashboard → Functions
+   - Look for any deployment errors
+
+2. **Verify file structure:**
+   ```
+   netlify/
+   └── functions/
+       └── api/
+           ├── groq.js
+           ├── study-sessions.js
+           ├── achievements.js
+           ├── test.js
+           ├── user/
+           │   └── [id].js
+           └── quiz-stats/
+               └── [id].js
+   ```
+
+3. **Test the function directly:**
+   - Visit: `https://your-site.netlify.app/.netlify/functions/api/test`
+   - Should return: `{"message":"Netlify Function is working!"}`
+
+4. **Check environment variables:**
+   - Verify all variables are set in Netlify dashboard
+   - Check that there are no typos
+
+### If you get 502 errors:
+
+1. **Check Groq API key:**
+   - Verify `GROQ_API_KEY` is set correctly
+   - Test the key manually
+
+2. **Check Supabase credentials:**
+   - Verify `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - Test connection to Supabase
+
+3. **Check function logs:**
+   - Look for specific error messages
+   - Check if tables exist in Supabase
+
+### If you get 400 errors:
+
+1. **Check Supabase tables:**
+   - Ensure `study_sessions` table exists
+   - Check Row Level Security (RLS) policies
+   - Verify table structure matches the code
+
+2. **Test Supabase connection:**
+   - Try accessing Supabase directly
+   - Check if tables are accessible
 
 ## Local Development
 
-For local development, you can still use the Next.js API routes. The Netlify Functions are only used in production. 
+For local development, you can still use the Next.js API routes. The Netlify Functions are only used in production.
+
+## File Structure Summary
+
+```
+├── netlify.toml                    # Netlify configuration
+├── netlify/
+│   └── functions/
+│       ├── package.json            # Function dependencies
+│       └── api/
+│           ├── groq.js            # Main AI API
+│           ├── study-sessions.js  # Study session management
+│           ├── achievements.js    # Achievement system
+│           ├── test.js            # Test function
+│           ├── user/
+│           │   └── [id].js       # User data
+│           └── quiz-stats/
+│               └── [id].js       # Quiz statistics
+└── hooks/
+    └── useStudySession.ts         # Updated to use API functions
+```
+
+## Common Issues & Solutions
+
+### Issue: Function not found (404)
+**Solution:** Check that the function file exists in the correct location and has the proper export.
+
+### Issue: Environment variables not working
+**Solution:** Ensure variables are set in Netlify dashboard, not in local `.env` files.
+
+### Issue: CORS errors
+**Solution:** The functions include proper CORS headers. Check if the request is reaching the function.
+
+### Issue: Supabase connection errors
+**Solution:** Verify Supabase URL and key are correct, and tables exist with proper permissions. 

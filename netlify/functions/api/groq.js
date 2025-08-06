@@ -16,6 +16,12 @@ function cleanJSON(content) {
 }
 
 exports.handler = async function(event, context) {
+  console.log('Groq function called with:', {
+    method: event.httpMethod,
+    path: event.path,
+    body: event.body ? JSON.parse(event.body) : null
+  });
+
   // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -45,6 +51,8 @@ exports.handler = async function(event, context) {
   try {
     const body = JSON.parse(event.body);
     const { subject, topic, type, language, question, chapter, difficulty } = body;
+
+    console.log('Processing request:', { type, subject, topic });
 
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
     const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -78,6 +86,7 @@ exports.handler = async function(event, context) {
       });
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Groq API error:', errorText);
         return {
           statusCode: 500,
           headers,
@@ -133,6 +142,7 @@ exports.handler = async function(event, context) {
       });
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Groq API error:', errorText);
         return {
           statusCode: 500,
           headers,
@@ -184,6 +194,7 @@ exports.handler = async function(event, context) {
       });
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Groq API error:', errorText);
         return {
           statusCode: 500,
           headers,
