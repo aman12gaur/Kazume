@@ -125,8 +125,35 @@ export function useUserMetrics(userId: string | null): UserMetrics {
       }
       setWeeklyProgress(week);
       
-      // Subject progress/mastery
-      const subjects = Array.from(new Set(quizResults.map(r => r.subject).filter(Boolean)));
+      // Calculate strongest subject based on quiz attempts and performance
+      const subjectStats: Record<string, { attempts: number; totalScore: number; avgScore: number }> = {};
+      
+      quizResults.forEach(result => {
+        if (result.chapter) {
+          // Extract subject from chapter (assuming format like "english-beehive-prose")
+          const subject = result.chapter.split('-')[0];
+          if (subject) {
+            if (!subjectStats[subject]) {
+              subjectStats[subject] = { attempts: 0, totalScore: 0, avgScore: 0 };
+            }
+            subjectStats[subject].attempts += 1;
+            subjectStats[subject].totalScore += result.score || 0;
+          }
+        }
+      });
+
+      // Calculate average scores and find strongest subject
+      let strongestSubject = '';
+      let maxScore = 0;
+      for (const [subject, stats] of Object.entries(subjectStats)) {
+        stats.avgScore = stats.totalScore / stats.attempts;
+        if (stats.attempts >= 2 && stats.avgScore > maxScore) { // Require at least 2 attempts
+          maxScore = stats.avgScore;
+          strongestSubject = subject.charAt(0).toUpperCase() + subject.slice(1); // Capitalize
+        }
+      }
+      
+      // Subject progress/mastery based on actual quiz data
       const subjectColors = [
         'bg-blue-500',
         'bg-green-500',
@@ -135,10 +162,15 @@ export function useUserMetrics(userId: string | null): UserMetrics {
         'bg-pink-500',
         'bg-yellow-500',
       ];
-      const subjectProg = subjects.map((subject, i) => {
-        const subjectResults = quizResults.filter(r => r.subject === subject);
-        const progress = subjectResults.length > 0 ? Math.round(subjectResults.reduce((acc, r) => acc + (r.score || 0), 0) / subjectResults.length) : 0;
-        return { subject, progress, color: subjectColors[i % subjectColors.length] };
+      
+      // Calculate subject progress from actual quiz data
+      const subjectProg = Object.entries(subjectStats).map(([subject, stats], i) => {
+        const progress = Math.round(stats.avgScore);
+        return { 
+          subject: subject.charAt(0).toUpperCase() + subject.slice(1), 
+          progress, 
+          color: subjectColors[i % subjectColors.length] 
+        };
       });
       setSubjectProgress(subjectProg);
       
@@ -169,18 +201,12 @@ export function useUserMetrics(userId: string | null): UserMetrics {
       // Overall stats
       const totalQuizzes = quizResults.length;
       const averageScore = totalQuizzes > 0 ? Math.round(quizResults.reduce((acc, r) => acc + (r.score || 0), 0) / totalQuizzes) : 0;
-      
-      // Strongest/improvement subject
-      let strongestSubject = '';
-      let maxScore = -1;
+
+      // Calculate improvement needed (subject with lowest average score)
       let improvementNeeded = '';
       let minScore = 101;
       for (const s of subjectProg) {
-        if (s.progress > maxScore) {
-          maxScore = s.progress;
-          strongestSubject = s.subject;
-        }
-        if (s.progress < minScore) {
+        if (s.progress < minScore && s.progress > 0) {
           minScore = s.progress;
           improvementNeeded = s.subject;
         }

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { TrendingUp, Trophy, Target, Clock, BookOpen, Brain, Calendar, Award } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { useUserMetrics } from '@/hooks/useUserMetrics';
+import { StudyTime } from '@/components/StudyTime';
 
 export default function ProgressPage() {
   // Example: get userId from localStorage (replace with your auth logic)
@@ -66,12 +67,18 @@ export default function ProgressPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Study Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Accuracy Rate</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{overallStats.totalStudyTime}</div>
-              <p className="text-xs text-muted-foreground">This month</p>
+              <div className="text-2xl font-bold">
+                {overallStats.totalQuestionsSolved > 0 
+                  ? Math.round((overallStats.totalCorrect / overallStats.totalQuestionsSolved) * 100)
+                  : 0}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {overallStats.totalCorrect}/{overallStats.totalQuestionsSolved} correct
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -90,8 +97,13 @@ export default function ProgressPage() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{overallStats.strongestSubject}</div>
-              <p className="text-xs text-muted-foreground">{subjectProgress.find(s => s.subject === overallStats.strongestSubject)?.progress || 0}% mastery</p>
+              <div className="text-2xl font-bold">{overallStats.strongestSubject || 'None yet'}</div>
+              <p className="text-xs text-muted-foreground">
+                {overallStats.strongestSubject 
+                  ? `${subjectProgress.find(s => s.subject.toLowerCase() === overallStats.strongestSubject.toLowerCase())?.progress || 0}% mastery`
+                  : 'Start taking quizzes'
+                }
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -177,6 +189,9 @@ export default function ProgressPage() {
           </div>
           {/* Right Column */}
           <div className="space-y-6">
+            {/* Study Time Component */}
+            <StudyTime userId={userId} />
+            
             {/* Achievements - Placeholder, as not in DB */}
             <Card>
               <CardHeader>
