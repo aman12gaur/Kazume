@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from '@/lib/supabaseClient';
+import { validateQuestions } from '@/lib/question-validation';
 
 function cleanJSON(content: string): string {
   let clean = content.trim();
@@ -107,7 +108,38 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "questions") {
-    let prompt = `You are an expert educational AI quiz generator. Your task is to produce 10 high-quality, Class 9-level multiple-choice questions (MCQs) in JSON format only.\n\n- Subject: \"${subject}\"\n- Chapter: \"${chapter}\"\n- Topic: \"${topic}\"\n- Difficulty: \"${difficulty}\"\n\nREQUIREMENTS:\n1. Each question must test precisely the specific topic \"${topic}\" from chapter \"${chapter}\" of subject \"${subject}\".\n2. Questions must be suitable for Class 9 with \"${difficulty}\" level. Use age-appropriate language and rigor.\n3. Output a JSON array of exactly 10 objects. Each object must have: id, question, options (array of 4), correctAnswer (index), correctAnswerText, explanation, subject, chapter, topic, difficulty.\n4. No extra text, only the JSON array.`;
+    let prompt = `You are an expert educational AI quiz generator for Indian Class 9 students. Your task is to produce 10 high-quality, accurate multiple-choice questions (MCQs) in JSON format only.
+
+SUBJECT: "${subject}"
+CHAPTER: "${chapter}"
+TOPIC: "${topic}"
+DIFFICULTY: "${difficulty}"
+
+CRITICAL REQUIREMENTS:
+1. Each question must test precisely the specific topic "${topic}" from chapter "${chapter}" of subject "${subject}"
+2. Questions must be suitable for Class 9 with "${difficulty}" level - use age-appropriate language and concepts
+3. ALL ANSWERS MUST BE FACTUALLY CORRECT - verify accuracy for Indian Class 9 curriculum
+4. Each question must have exactly 4 options (A, B, C, D)
+5. correctAnswer must be the index (0-3) of the correct option
+6. correctAnswerText must match the exact text of the correct option
+7. All options should be plausible but only one should be correct
+8. Include clear explanations for why the correct answer is right
+9. Use Indian educational context and examples where appropriate
+
+OUTPUT FORMAT:
+JSON array of exactly 10 objects with these fields:
+- id: unique identifier
+- question: the question text
+- options: array of 4 answer choices
+- correctAnswer: index (0-3) of correct option
+- correctAnswerText: exact text of correct answer
+- explanation: why the correct answer is right
+- subject: "${subject}"
+- chapter: "${chapter}"
+- topic: "${topic}"
+- difficulty: "${difficulty}"
+
+IMPORTANT: Ensure all questions are factually accurate and appropriate for Class 9 level. Double-check that correctAnswer index matches the correctAnswerText.`;
     const groqPayload = {
       model,
       messages: [
@@ -140,13 +172,22 @@ export async function POST(req: NextRequest) {
     try {
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed)) {
+        // Validate and format questions using the validation utility
+        const validatedQuestions = validateQuestions(parsed).map((q, index) => ({
+          ...q,
+          subject: q.subject || subject,
+          chapter: q.chapter || chapter,
+          topic: q.topic || topic,
+          difficulty: q.difficulty || difficulty
+        }));
+        
         // Store interaction in Supabase
         await supabase.from('interactions').insert([
           {
-            type: 'questions', subject, topic, chapter, difficulty, language, question: null, response: JSON.stringify(parsed), timestamp
+            type: 'questions', subject, topic, chapter, difficulty, language, question: null, response: JSON.stringify(validatedQuestions), timestamp
           }
         ]);
-        return NextResponse.json(parsed);
+        return NextResponse.json(validatedQuestions);
       } else {
         return NextResponse.json({ error: "AI did not return a JSON array." }, { status: 500 });
       }

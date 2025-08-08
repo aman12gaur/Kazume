@@ -9,7 +9,7 @@ interface StudySession {
 }
 
 interface StudyTimeState {
-  totalDuration: Duration;
+  baseTotalDuration: Duration; // Total from completed sessions
   currentSessionStart: DateTime | null;
   isTracking: boolean;
   formattedTime: string;
@@ -17,7 +17,7 @@ interface StudyTimeState {
 
 export function useStudyTimeTracker(userId: string | null) {
   const [state, setState] = useState<StudyTimeState>({
-    totalDuration: Duration.fromMillis(0),
+    baseTotalDuration: Duration.fromMillis(0),
     currentSessionStart: null,
     isTracking: false,
     formattedTime: '0h 0m'
@@ -32,24 +32,9 @@ export function useStudyTimeTracker(userId: string | null) {
 
     const loadStudyTime = async () => {
       try {
-        // Load from localStorage for immediate display
-        const stored = localStorage.getItem(`studyTime_${userId}`);
-        if (stored) {
-          const { totalMillis, lastUpdated } = JSON.parse(stored);
-          const lastUpdate = DateTime.fromISO(lastUpdated);
-          const currentMonth = DateTime.now().startOf('month');
-          
-          // Only use stored data if it's from current month
-          if (lastUpdate.hasSame(currentMonth, 'month')) {
-            setState(prev => ({
-              ...prev,
-              totalDuration: Duration.fromMillis(totalMillis),
-              formattedTime: formatDuration(Duration.fromMillis(totalMillis))
-            }));
-          }
-        }
-
-        // Load from database
+        let baseTotalMillis = 0;
+        
+        // First, load from database to get the most accurate total
         const { data: sessions } = await supabase
           .from('study_sessions')
           .select('start_time, end_time, duration')
@@ -58,23 +43,57 @@ export function useStudyTimeTracker(userId: string | null) {
           .order('start_time', { ascending: false });
 
         if (sessions && sessions.length > 0) {
-          const totalMillis = sessions.reduce((acc, session) => {
+          baseTotalMillis = sessions.reduce((acc, session) => {
             return acc + (session.duration || 0) * 1000; // Convert seconds to milliseconds
           }, 0);
-
-          const totalDuration = Duration.fromMillis(totalMillis);
-          setState(prev => ({
-            ...prev,
-            totalDuration,
-            formattedTime: formatDuration(totalDuration)
-          }));
-
-          // Update localStorage
-          localStorage.setItem(`studyTime_${userId}`, JSON.stringify({
-            totalMillis,
-            lastUpdated: DateTime.now().toISO()
-          }));
         }
+
+        // Then check localStorage for any unsaved session data
+        const stored = localStorage.getItem(`studyTime_${userId}`);
+        if (stored) {
+          const { totalMillis: storedMillis, lastUpdated, sessionStart } = JSON.parse(stored);
+          const lastUpdate = DateTime.fromISO(lastUpdated);
+          const currentMonth = DateTime.now().startOf('month');
+          
+          // Only use stored data if it's from current month
+          if (lastUpdate.hasSame(currentMonth, 'month')) {
+            // Use the stored total as the base total
+            baseTotalMillis = Math.max(baseTotalMillis, storedMillis);
+            
+            // If there's an ongoing session, start tracking from that point
+            if (sessionStart) {
+              const sessionStartTime = DateTime.fromISO(sessionStart);
+              sessionStartRef.current = sessionStartTime;
+              setState(prev => ({
+                ...prev,
+                baseTotalDuration: Duration.fromMillis(baseTotalMillis),
+                currentSessionStart: sessionStartTime,
+                isTracking: true,
+                formattedTime: formatDuration(Duration.fromMillis(baseTotalMillis))
+              }));
+              
+              // Start the interval for updates
+              intervalRef.current = setInterval(() => {
+                updateDisplay();
+              }, 60000); // Update every minute
+              
+              return; // Exit early since we're continuing an existing session
+            }
+          }
+        }
+
+        const baseTotalDuration = Duration.fromMillis(baseTotalMillis);
+        setState(prev => ({
+          ...prev,
+          baseTotalDuration,
+          formattedTime: formatDuration(baseTotalDuration)
+        }));
+
+        // Update localStorage with current base total
+        localStorage.setItem(`studyTime_${userId}`, JSON.stringify({
+          totalMillis: baseTotalMillis,
+          lastUpdated: DateTime.now().toISO()
+        }));
       } catch (error) {
         console.error('Error loading study time:', error);
       }
@@ -96,6 +115,15 @@ export function useStudyTimeTracker(userId: string | null) {
         isTracking: true
       }));
 
+      // Save session start to localStorage for continuity
+      const stored = localStorage.getItem(`studyTime_${userId}`);
+      const storedData = stored ? JSON.parse(stored) : {};
+      localStorage.setItem(`studyTime_${userId}`, JSON.stringify({
+        ...storedData,
+        sessionStart: now.toISO(),
+        lastUpdated: now.toISO()
+      }));
+
       // Update every minute
       intervalRef.current = setInterval(() => {
         updateDisplay();
@@ -107,20 +135,20 @@ export function useStudyTimeTracker(userId: string | null) {
         const sessionEnd = DateTime.now();
         const sessionDuration = sessionEnd.diff(sessionStartRef.current);
         
-        // Add to total duration
+        // Add session duration to the base total
         setState(prev => {
-          const newTotal = prev.totalDuration.plus(sessionDuration);
-          const formatted = formatDuration(newTotal);
+          const newBaseTotal = prev.baseTotalDuration.plus(sessionDuration);
+          const formatted = formatDuration(newBaseTotal);
           
-          // Save to localStorage
+          // Save to localStorage (remove sessionStart to indicate no ongoing session)
           localStorage.setItem(`studyTime_${userId}`, JSON.stringify({
-            totalMillis: newTotal.toMillis(),
+            totalMillis: newBaseTotal.toMillis(),
             lastUpdated: DateTime.now().toISO()
           }));
 
           return {
             ...prev,
-            totalDuration: newTotal,
+            baseTotalDuration: newBaseTotal,
             formattedTime: formatted,
             currentSessionStart: null,
             isTracking: false
@@ -139,15 +167,19 @@ export function useStudyTimeTracker(userId: string | null) {
       }
     };
 
-    // Start tracking
-    startTracking();
+    // Only start tracking if we don't already have an ongoing session
+    if (!sessionStartRef.current) {
+      startTracking();
+    }
 
     // Handle page visibility changes
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopTracking();
       } else {
-        startTracking();
+        if (!sessionStartRef.current) {
+          startTracking();
+        }
       }
     };
 
@@ -171,11 +203,19 @@ export function useStudyTimeTracker(userId: string | null) {
     if (sessionStartRef.current) {
       const currentDuration = DateTime.now().diff(sessionStartRef.current);
       setState(prev => {
-        const newTotal = prev.totalDuration.plus(currentDuration);
+        // Calculate display total: base total + current session duration
+        const displayTotal = prev.baseTotalDuration.plus(currentDuration);
+        
+        // Update localStorage with current total for display
+        localStorage.setItem(`studyTime_${userId}`, JSON.stringify({
+          totalMillis: displayTotal.toMillis(),
+          lastUpdated: DateTime.now().toISO(),
+          sessionStart: sessionStartRef.current?.toISO()
+        }));
+        
         return {
           ...prev,
-          totalDuration: newTotal,
-          formattedTime: formatDuration(newTotal)
+          formattedTime: formatDuration(displayTotal)
         };
       });
     }
@@ -206,6 +246,6 @@ export function useStudyTimeTracker(userId: string | null) {
   return {
     formattedTime: state.formattedTime,
     isTracking: state.isTracking,
-    totalDuration: state.totalDuration
+    totalDuration: state.baseTotalDuration
   };
 } 

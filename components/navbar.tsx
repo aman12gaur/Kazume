@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Brain, BookOpen, Trophy, TrendingUp, Home, LogOut, Menu, X } from "lucide-react"
+import { Brain, BookOpen, Trophy, TrendingUp, Home, LogOut, Menu, X, User } from "lucide-react"
 
 export function Navbar() {
   const [user, setUser] = useState<{ name: string; id: string } | null>(null)
@@ -67,18 +67,24 @@ export function Navbar() {
           </div>
 
           {/* User Menu */}
-          <div className="hidden md:flex items-center gap-4">
-            {user && (
-              <div className="text-sm">
-                <span className="text-gray-600">Welcome, </span>
-                <span className="font-medium">{user.name.split(' ')[0]}</span>
-              </div>
-            )}
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+                      <div className="hidden md:flex items-center gap-4">
+              {user && (
+                <div className="text-sm">
+                  <span className="text-gray-600">Welcome, </span>
+                  <span className="font-medium">{user.name.split(' ')[0]}</span>
+                </div>
+              )}
+              <Link href="/profile">
+                <Button variant="outline" size="sm">
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </Button>
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
 
           {/* Mobile Menu Button */}
           <Button
@@ -115,18 +121,24 @@ export function Navbar() {
                 )
               })}
 
-              <div className="pt-4 border-t border-gray-200">
-                {user && (
-                  <div className="text-sm mb-3 px-3">
-                    <span className="text-gray-600">Welcome, </span>
-                    <span className="font-medium">{user.name.split(' ')[0]}</span>
-                  </div>
-                )}
-                <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" onClick={handleLogout}>
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </Button>
-              </div>
+                              <div className="pt-4 border-t border-gray-200">
+                  {user && (
+                    <div className="text-sm mb-3 px-3">
+                      <span className="text-gray-600">Welcome, </span>
+                      <span className="font-medium">{user.name.split(' ')[0]}</span>
+                    </div>
+                  )}
+                  <Link href="/profile">
+                    <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
+                      <User className="w-4 h-4" />
+                      Profile
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" onClick={handleLogout}>
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </Button>
+                </div>
             </div>
           </div>
         )}

@@ -51,9 +51,22 @@ function AuthContent() {
               localStorage.setItem('gyaan_user', JSON.stringify(userObj));
             }
             
-            // Clear the URL fragment and redirect to dashboard
+            // Check if user has completed profile
+            const { data: profile } = await supabase
+              .from('student_profiles')
+              .select('id')
+              .eq('user_id', userObj.id)
+              .single();
+            
+            // Clear the URL fragment
             window.history.replaceState({}, document.title, window.location.pathname);
-            router.replace("/dashboard");
+            
+            // Redirect to profile if not completed, otherwise to dashboard
+            if (!profile) {
+              router.replace("/profile");
+            } else {
+              router.replace("/dashboard");
+            }
             return;
           }
         }
@@ -76,7 +89,20 @@ function AuthContent() {
           if (typeof window !== 'undefined') {
             localStorage.setItem('gyaan_user', JSON.stringify(userObj));
           }
-          router.replace("/dashboard");
+          
+          // Check if user has completed profile
+          const { data: profile } = await supabase
+            .from('student_profiles')
+            .select('id')
+            .eq('user_id', userObj.id)
+            .single();
+          
+          // Redirect to profile if not completed, otherwise to dashboard
+          if (!profile) {
+            router.replace("/profile");
+          } else {
+            router.replace("/dashboard");
+          }
         } else {
           setIsVerified(false);
         }
