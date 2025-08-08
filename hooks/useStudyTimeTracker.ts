@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { DateTime, Duration } from 'luxon';
-import { supabase } from '@/lib/supabaseClient';
-
-interface StudySession {
-  start: DateTime;
-  end: DateTime;
-  duration: Duration;
-}
 
 interface StudyTimeState {
   baseTotalDuration: Duration; // Total from completed sessions
@@ -26,7 +19,7 @@ export function useStudyTimeTracker(userId: string | null) {
   const sessionStartRef = useRef<DateTime | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load existing study time from localStorage and database
+  // Load existing study time from localStorage and server
   useEffect(() => {
     if (!userId) return;
 
@@ -34,18 +27,14 @@ export function useStudyTimeTracker(userId: string | null) {
       try {
         let baseTotalMillis = 0;
         
-        // First, load from database to get the most accurate total
-        const { data: sessions } = await supabase
-          .from('study_sessions')
-          .select('start_time, end_time, duration')
-          .eq('user_id', userId)
-          .gte('start_time', DateTime.now().startOf('month').toISO())
-          .order('start_time', { ascending: false });
-
-        if (sessions && sessions.length > 0) {
-          baseTotalMillis = sessions.reduce((acc, session) => {
-            return acc + (session.duration || 0) * 1000; // Convert seconds to milliseconds
-          }, 0);
+        // Fetch from server API (service key)
+        const monthStart = DateTime.now().startOf('month').toISO();
+        const res = await fetch(`/api/progress/study-sessions?userId=${encodeURIComponent(userId)}&month=${encodeURIComponent(monthStart!)}`);
+        if (res.ok) {
+          const { data: sessions } = await res.json();
+          if (sessions && sessions.length > 0) {
+            baseTotalMillis = sessions.reduce((acc: number, session: any) => acc + (session.duration || 0) * 1000, 0);
+          }
         }
 
         // Then check localStorage for any unsaved session data
@@ -133,7 +122,8 @@ export function useStudyTimeTracker(userId: string | null) {
     const stopTracking = () => {
       if (sessionStartRef.current) {
         const sessionEnd = DateTime.now();
-        const sessionDuration = sessionEnd.diff(sessionStartRef.current);
+        const sessionStart = sessionStartRef.current;
+        const sessionDuration = sessionEnd.diff(sessionStart);
         
         // Add session duration to the base total
         setState(prev => {
@@ -155,8 +145,20 @@ export function useStudyTimeTracker(userId: string | null) {
           };
         });
 
-        // Save session to database
-        saveSessionToDatabase(sessionStartRef.current, sessionEnd, sessionDuration);
+        // Persist session via API
+        if (userId) {
+          fetch('/api/progress/study-sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              start_time: sessionStart.toISO(),
+              end_time: sessionEnd.toISO(),
+              duration: Math.floor(sessionDuration.as('seconds')),
+              subject: null,
+            })
+          }).catch(err => console.error('Error saving study session:', err));
+        }
         
         sessionStartRef.current = null;
       }
@@ -218,22 +220,6 @@ export function useStudyTimeTracker(userId: string | null) {
           formattedTime: formatDuration(displayTotal)
         };
       });
-    }
-  };
-
-  const saveSessionToDatabase = async (start: DateTime, end: DateTime, duration: Duration) => {
-    if (!userId) return;
-
-    try {
-      await supabase.from('study_sessions').insert({
-        user_id: userId,
-        start_time: start.toISO(),
-        end_time: end.toISO(),
-        duration: Math.floor(duration.as('seconds')),
-        study_type: 'dashboard_tracking'
-      });
-    } catch (error) {
-      console.error('Error saving study session:', error);
     }
   };
 

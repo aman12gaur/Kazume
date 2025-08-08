@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { DateTime, Duration } from 'luxon';
-import { supabase } from '@/lib/supabaseClient';
 
 interface TimerState {
   initialDuration: Duration;
@@ -56,9 +55,9 @@ export function usePomodoroTimer(userId: string | null) {
           clearInterval(intervalRef.current!);
           intervalRef.current = null;
           
-          // Save completed session to database
+          // Save completed session via API
           if (userId && startTimeRef.current) {
-            saveSessionToDatabase(startTimeRef.current, DateTime.now(), prev.initialDuration);
+            saveSession(startTimeRef.current, DateTime.now(), prev.initialDuration);
           }
 
           return {
@@ -112,9 +111,9 @@ export function usePomodoroTimer(userId: string | null) {
           clearInterval(intervalRef.current!);
           intervalRef.current = null;
           
-          // Save completed session to database
+          // Save completed session via API
           if (userId && startTimeRef.current) {
-            saveSessionToDatabase(startTimeRef.current, DateTime.now(), prev.initialDuration);
+            saveSession(startTimeRef.current, DateTime.now(), prev.initialDuration);
           }
 
           return {
@@ -160,17 +159,20 @@ export function usePomodoroTimer(userId: string | null) {
     }));
   };
 
-  // Save session to database
-  const saveSessionToDatabase = async (start: DateTime, end: DateTime, duration: Duration) => {
+  // Save session via API
+  const saveSession = async (start: DateTime, end: DateTime, duration: Duration) => {
     if (!userId) return;
-
     try {
-      await supabase.from('study_sessions').insert({
-        user_id: userId,
-        start_time: start.toISO(),
-        end_time: end.toISO(),
-        duration: Math.floor(duration.as('seconds')),
-        study_type: 'pomodoro_timer'
+      await fetch('/api/progress/study-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          start_time: start.toISO(),
+          end_time: end.toISO(),
+          duration: Math.floor(duration.as('seconds')),
+          subject: null,
+        })
       });
     } catch (error) {
       console.error('Error saving pomodoro session:', error);

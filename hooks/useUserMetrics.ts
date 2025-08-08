@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 
 export interface SubjectProgress {
   subject: string;
@@ -16,6 +15,7 @@ export interface RecentQuiz {
   questionsCorrect: number;
   totalQuestions: number;
   chapter?: string;
+  created_at?: string;
 }
 
 export interface OverallStats {
@@ -77,14 +77,23 @@ export function useUserMetrics(userId: string | null): UserMetrics {
     setLoading(true);
     setError(null);
     try {
-      // Fetch quiz results only
-      const { data: quizResults, error: quizError } = await supabase
-        .from('quiz_results')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      
-      if (quizError) throw quizError;
+      const res = await fetch(`/api/progress/metrics?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as any));
+        throw new Error((body as any).error || `Failed to load metrics (${res.status})`);
+      }
+      const { data } = (await res.json()) as { data: any[] };
+      const quizResults = (data || []) as Array<{
+        id: string;
+        subject?: string;
+        score?: number;
+        created_at?: string;
+        time_taken?: number;
+        correct_answers?: number;
+        wrong_answers?: number;
+        total_questions?: number;
+        chapter?: string;
+      }>;
 
       // Quizzes attempted
       setQuizzesAttempted(quizResults.length);
@@ -98,47 +107,40 @@ export function useUserMetrics(userId: string | null): UserMetrics {
       const totalWrong = quizResults.reduce((acc, r) => acc + (r.wrong_answers || 0), 0);
       
       // Chapters completed (from quiz_results only)
-      const quizChapters = quizResults.map(r => r.chapter).filter(Boolean);
-      const chaptersCompleted = Array.from(new Set(quizChapters));
+      const quizChapters = quizResults.map(r => r.chapter).filter((v): v is string => Boolean(v));
+      const chaptersCompleted = Array.from(new Set<string>(quizChapters));
       
       // Recent quizzes (last 4)
       setRecentQuizzes(quizResults.slice(0, 4).map(r => ({
         id: r.id,
         subject: r.subject || 'Unknown',
-        score: r.score,
+        score: r.score || 0,
         date: r.created_at?.slice(0, 10) || '',
-        timeTaken: r.time_taken?.toString() || '0',
-        questionsCorrect: r.correct_answers,
-        totalQuestions: r.total_questions,
+        timeTaken: (r.time_taken ?? 0).toString(),
+        questionsCorrect: r.correct_answers || 0,
+        totalQuestions: r.total_questions || 0,
         chapter: r.chapter,
+        created_at: r.created_at,
       })));
       
       // Weekly progress (last 7 days)
-      const week = Array(7).fill(0);
+      const week = Array(7).fill(0) as number[];
       const now = new Date();
       for (let i = 0; i < 7; i++) {
         const day = new Date(now);
         day.setDate(now.getDate() - i);
         const dayStr = day.toISOString().slice(0, 10);
-        const dayResults = quizResults.filter(r => r.created_at?.slice(0, 10) === dayStr);
+        const dayResults = quizResults.filter(r => (r.created_at?.slice(0, 10) || '') === dayStr);
         week[6 - i] = dayResults.length > 0 ? Math.round(dayResults.reduce((acc, r) => acc + (r.score || 0), 0) / dayResults.length) : 0;
       }
       setWeeklyProgress(week);
       
       // Subject progress/mastery - extract subjects from chapter names
-      const subjectMap: Record<string, string[]> = {};
-      quizResults.forEach(result => {
-        if (result.chapter) {
-          // Extract subject from chapter name (e.g., "Math Algebra" -> "Math")
-          const subject = result.chapter.split(' ')[0];
-          if (!subjectMap[subject]) {
-            subjectMap[subject] = [];
-          }
-          subjectMap[subject].push(result.chapter);
-        }
-      });
-      
-      const subjects = Object.keys(subjectMap);
+      const subjects = Array.from(new Set<string>(
+        quizResults
+          .filter(r => !!r.chapter)
+          .map(r => (r.chapter as string).split(' ')[0])
+      ));
       const subjectColors = [
         'bg-blue-500',
         'bg-green-500',
@@ -147,24 +149,21 @@ export function useUserMetrics(userId: string | null): UserMetrics {
         'bg-pink-500',
         'bg-yellow-500',
       ];
-      
-      const subjectProg = subjects.map((subject, i) => {
-        const subjectResults = quizResults.filter(r => r.chapter && r.chapter.startsWith(subject));
+      const subjectProg: SubjectProgress[] = subjects.map((subject, i) => {
+        const subjectResults = quizResults.filter(r => r.chapter && (r.chapter as string).startsWith(subject));
         const progress = subjectResults.length > 0 ? Math.round(subjectResults.reduce((acc, r) => acc + (r.score || 0), 0) / subjectResults.length) : 0;
         return { subject, progress, color: subjectColors[i % subjectColors.length] };
       });
       setSubjectProgress(subjectProg);
       
-      // Streak calculation (active days from quiz results only)
-      const quizDays = quizResults.map(r => r.created_at?.slice(0, 10)).filter(Boolean);
-      const allDays = Array.from(new Set(quizDays)).sort();
-      
-      // Calculate streak: increment for each consecutive day, reset to 1 if a day is missed
+      // Streak calculation
+      const quizDays = quizResults.map(r => r.created_at?.slice(0, 10)).filter((v): v is string => Boolean(v));
+      const allDays = Array.from(new Set<string>(quizDays)).sort();
       let streak = 1;
       let maxStreak = 1;
       for (let i = allDays.length - 1; i > 0; i--) {
-        const d1 = new Date(allDays[i]);
-        const d2 = new Date(allDays[i - 1]);
+        const d1 = new Date(allDays[i] as string);
+        const d2 = new Date(allDays[i - 1] as string);
         if (d1.getTime() - d2.getTime() === 86400000) {
           streak++;
           if (streak > maxStreak) maxStreak = streak;
@@ -172,7 +171,6 @@ export function useUserMetrics(userId: string | null): UserMetrics {
           streak = 1;
         }
       }
-      // If the last active day is not today, streak = 1
       const todayStr = now.toISOString().slice(0, 10);
       if (allDays.length === 0 || allDays[allDays.length - 1] !== todayStr) {
         streak = 1;
@@ -182,16 +180,13 @@ export function useUserMetrics(userId: string | null): UserMetrics {
       // Overall stats
       const totalQuizzes = quizResults.length;
       const averageScore = totalQuizzes > 0 ? Math.round(quizResults.reduce((acc, r) => acc + (r.score || 0), 0) / totalQuizzes) : 0;
-      
-      // Calculate strongest subject based on most quiz attempts
       const subjectAttempts: Record<string, number> = {};
       quizResults.forEach(result => {
         if (result.chapter) {
-          const subject = result.chapter.split(' ')[0];
+          const subject = (result.chapter as string).split(' ')[0];
           subjectAttempts[subject] = (subjectAttempts[subject] || 0) + 1;
         }
       });
-      
       let strongestSubject = '';
       let maxAttempts = 0;
       for (const [subject, attempts] of Object.entries(subjectAttempts)) {
@@ -200,12 +195,10 @@ export function useUserMetrics(userId: string | null): UserMetrics {
           strongestSubject = subject;
         }
       }
-      
-      // Calculate improvement needed (subject with lowest average score)
       const subjectScores: Record<string, { total: number; count: number }> = {};
       quizResults.forEach(result => {
         if (result.chapter) {
-          const subject = result.chapter.split(' ')[0];
+          const subject = (result.chapter as string).split(' ')[0];
           if (!subjectScores[subject]) {
             subjectScores[subject] = { total: 0, count: 0 };
           }
@@ -213,7 +206,6 @@ export function useUserMetrics(userId: string | null): UserMetrics {
           subjectScores[subject].count += 1;
         }
       });
-      
       let improvementNeeded = '';
       let minAvgScore = 101;
       for (const [subject, scores] of Object.entries(subjectScores)) {
@@ -223,11 +215,10 @@ export function useUserMetrics(userId: string | null): UserMetrics {
           improvementNeeded = subject;
         }
       }
-      
       setOverallStats({
         totalQuizzes,
         averageScore,
-        totalStudyTime: '0h 0m', // No study sessions table
+        totalStudyTime: '0h 0m',
         currentStreak: streak,
         strongestSubject,
         improvementNeeded,
@@ -237,15 +228,14 @@ export function useUserMetrics(userId: string | null): UserMetrics {
         chaptersCompleted,
         activeDays: allDays,
       });
-
-      // --- Calculate deltas for dashboard ---
+      
+      // Deltas
       const getDayStr = (date: Date) => date.toISOString().slice(0, 10);
       const quizzesByDay: Record<string, number> = {};
       quizResults.forEach(r => {
         const d = r.created_at?.slice(0, 10);
         if (d) quizzesByDay[d] = (quizzesByDay[d] || 0) + 1;
       });
-      
       let quizzesThisWeek = 0;
       let quizzesLastWeek = 0;
       for (let i = 0; i < 7; i++) {
@@ -260,7 +250,6 @@ export function useUserMetrics(userId: string | null): UserMetrics {
       }
       setQuizzesDeltaLastWeek(quizzesThisWeek - quizzesLastWeek);
       
-      // Questions: today vs yesterday
       let questionsToday = 0;
       let questionsYesterday = 0;
       const today = getDayStr(now);
@@ -271,7 +260,6 @@ export function useUserMetrics(userId: string | null): UserMetrics {
         if (d === yesterday) questionsYesterday += r.total_questions || 0;
       });
       setQuestionsDeltaYesterday(questionsToday - questionsYesterday);
-      
     } catch (err: any) {
       setError(err.message || 'Failed to fetch metrics');
     } finally {

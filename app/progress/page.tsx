@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -7,10 +8,59 @@ import { TrendingUp, Trophy, Target, Clock, BookOpen, Brain, Calendar, Award } f
 import { Navbar } from "@/components/navbar"
 import { useUserMetrics } from '@/hooks/useUserMetrics';
 import { StudyTime } from '@/components/StudyTime';
+import { createClient } from "@/lib/supabaseBrowserClient";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export default function ProgressPage() {
-  // Example: get userId from localStorage (replace with your auth logic)
-  const userId = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('gyaan_user') || '{}').id : null;
+  const [user, setUser] = useState<User | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+
+  // Get user from localStorage and fetch user data if needed
+  useEffect(() => {
+    const userData = localStorage.getItem('gyaan_user');
+    if (!userData) {
+      const checkSupabaseUser = async () => {
+        try {
+          const supabase = createClient();
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (user && !error) {
+            const userObj = {
+              id: user.id,
+              name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+              email: user.email || ''
+            };
+            localStorage.setItem('gyaan_user', JSON.stringify(userObj));
+            setUser(userObj);
+            setUserLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking Supabase user:', error);
+        }
+        // Fallback to default user for demo
+        const defaultUser = { id: "5d23c823-d199-4b6c-9983-1b909a14f3aa", name: "Aman Gaur", email: "aman.gaur5505@gmail.com" };
+        localStorage.setItem('gyaan_user', JSON.stringify(defaultUser));
+        setUser(defaultUser);
+        setUserLoading(false);
+      };
+      checkSupabaseUser();
+      return;
+    }
+
+    const parsedUser = JSON.parse(userData);
+    if (!parsedUser.id) {
+      setUserLoading(false);
+      return;
+    }
+    setUser(parsedUser);
+    setUserLoading(false);
+  }, []);
+
   const {
     quizzesAttempted,
     totalQuestions,
@@ -22,7 +72,18 @@ export default function ProgressPage() {
     loading,
     error,
     refetch,
-  } = useUserMetrics(userId);
+  } = useUserMetrics(user?.id || null);
+
+  // Refetch metrics when returning to tab
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refetch]);
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-600 bg-green-50';
@@ -42,7 +103,7 @@ export default function ProgressPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (userLoading || loading) return <div className="p-8 text-center">Loading...</div>;
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
   return (
@@ -190,7 +251,7 @@ export default function ProgressPage() {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Study Time Component */}
-            <StudyTime userId={userId} />
+            <StudyTime userId={user?.id || null} />
             
             {/* Achievements - Placeholder, as not in DB */}
             <Card>
