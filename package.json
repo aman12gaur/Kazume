@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "export": "next build",
+    "firebase-deploy": "npm run export && firebase deploy --only hosting"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
