@@ -25,3 +25,26 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Docker
+.dockerignore
+
+# Kubernetes secrets (keep templates, ignore actual secrets)
+k8s/secret.yaml
+!k8s/secret.yaml.example
+
+# Fly.io
+.fly/
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
