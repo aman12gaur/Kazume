@@ -1,15 +1,16 @@
 [build]
-  command = "npm run build"
+  command = "pnpm build"
   publish = ".next"
-
-[build.environment]
-  NEXT_PUBLIC_SUPABASE_URL = ""
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+[functions]
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/_next/static/:splat"
   status = 200
+  force = true
+  conditions = {path = "/_next/static/*"}

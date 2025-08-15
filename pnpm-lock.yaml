@@ -186,6 +186,9 @@ importers:
         specifier: latest
         version: 3.24.6(zod@3.25.76)
     devDependencies:
+      '@netlify/plugin-nextjs':
+        specifier: ^5.12.0
+        version: 5.12.0
       '@types/node':
         specifier: ^22
         version: 22.16.2
@@ -405,6 +408,10 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@langchain/core': '>=0.3.58 <0.4.0'
+
+  '@netlify/plugin-nextjs@5.12.0':
+    resolution: {integrity: sha512-SXQY/nCiSOSAZWNls/DQxrICldUR7PHSMUw2J2/ZejH1dk12Vwd3+SzSihHrRW9PNcErZkC2g3seM7bWZlvBRg==}
+    engines: {node: '>=18.0.0'}
 
   '@next/env@15.2.4':
     resolution: {integrity: sha512-+SFtMgoiYP3WoSswuNmxJOCwi06TdWE733D+WPjpXIe4LXGULwEaofiiAy6kbS0+XjM5xF5n3lKuBwN2SnqD9g==}
@@ -2455,6 +2462,8 @@ snapshots:
       zod: 3.25.76
     transitivePeerDependencies:
       - ws
+
+  '@netlify/plugin-nextjs@5.12.0': {}
 
   '@next/env@15.2.4': {}
 
