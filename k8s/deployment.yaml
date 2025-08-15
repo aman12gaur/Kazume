@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: nextjs-app
-        image: ghcr.io/YOUR_GITHUB_USERNAME/YOUR_REPO:latest
+        image: ghcr.io/aman12gaur/Kazume:latest
         ports:
           - containerPort: 3000
             name: http
