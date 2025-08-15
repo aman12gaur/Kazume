@@ -5,12 +5,18 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+[build.environment]
+  NEXT_RUNTIME = "nodejs"
+  NODE_VERSION = "18"
+
 [functions]
   node_bundler = "esbuild"
+  included_files = ["next.config.mjs"]
 
 [[redirects]]
   from = "/*"
-  to = "/_next/static/:splat"
+  to = "/index.html"
   status = 200
-  force = true
-  conditions = {path = "/_next/static/*"}
+
+[dev]
+  framework = "next"
