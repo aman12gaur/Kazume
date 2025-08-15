@@ -1,7 +1,7 @@
 [build]
   command = "pnpm build"
   publish = ".next"
-  edge_functions = true
+  functions = "netlify/functions"
 
 [build.environment]
   NEXT_USE_NETLIFY_EDGE = "true"
@@ -11,9 +11,10 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[[edge_functions]]
-  function = "next-dev"
-  pattern = "/*"
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/next_server"
+  status = 200
 
 [[headers]]
   for = "/*"
